@@ -60,18 +60,18 @@ public class ThemeBundle implements CustomizationOption<ThemeBundle> {
     private final String mTitle;
     private final PreviewInfo mPreviewInfo;
     private final boolean mIsDefault;
-    private final Map<String, String> mPackagesByCategory;
+    protected final Map<String, String> mPackagesByCategory;
     @Nullable private final WallpaperInfo mWallpaperInfo;
     private WallpaperInfo mOverrideWallpaper;
 
-    private ThemeBundle(String title, Map<String, String> overlayPackages,
+    protected ThemeBundle(String title, Map<String, String> overlayPackages,
             boolean isDefault, @Nullable WallpaperInfo wallpaperInfo,
             PreviewInfo previewInfo) {
         mTitle = title;
         mIsDefault = isDefault;
         mPreviewInfo = previewInfo;
         mWallpaperInfo = wallpaperInfo;
-        mPackagesByCategory = Collections.unmodifiableMap(overlayPackages);        
+        mPackagesByCategory = Collections.unmodifiableMap(overlayPackages);
     }
 
     @Override
@@ -83,13 +83,11 @@ public class ThemeBundle implements CustomizationOption<ThemeBundle> {
     public void bindThumbnailTile(View view) {
         Resources res = view.getContext().getResources();
 
-        ((ImageView) view.findViewById(R.id.theme_option_color)).setImageTintList(
-                ColorStateList.valueOf(mPreviewInfo.colorAccentLight));
         ((TextView) view.findViewById(R.id.theme_option_font)).setTypeface(
                 mPreviewInfo.headlineFontFamily);
         if (mPreviewInfo.shapeDrawable != null) {
-            ((ShapeDrawable)mPreviewInfo.shapeDrawable).getPaint().setColor(res.getColor(
-                    R.color.shape_thumbnail_color, null));
+            ((ShapeDrawable) mPreviewInfo.shapeDrawable).getPaint().setColor(
+                    mPreviewInfo.colorAccentLight);
             ((ImageView) view.findViewById(R.id.theme_option_shape)).setImageDrawable(
                     mPreviewInfo.shapeDrawable);
         }
@@ -127,7 +125,7 @@ public class ThemeBundle implements CustomizationOption<ThemeBundle> {
         mOverrideWallpaper = homeWallpaper;
     }
 
-    public boolean useThemeWallpaper() {
+    public boolean shouldUseThemeWallpaper() {
         return mOverrideWallpaper == null && mWallpaperInfo != null;
     }
 
@@ -199,7 +197,7 @@ public class ThemeBundle implements CustomizationOption<ThemeBundle> {
 
     public static class Builder {
         private static final float PATH_SIZE = 100f;
-        private String mTitle;
+        protected String mTitle;
         private Typeface mBodyFontFamily;
         private Typeface mHeadlineFontFamily;
         @ColorInt private int mColorAccentLight;
@@ -211,21 +209,25 @@ public class ThemeBundle implements CustomizationOption<ThemeBundle> {
         private ResourceAsset mColorPreview;
         private ResourceAsset mShapePreview;
         private WallpaperInfo mWallpaperInfo;
-        private Map<String, String> mPackages = new HashMap<>();
+        protected Map<String, String> mPackages = new HashMap<>();
 
         public ThemeBundle build() {
+            return new ThemeBundle(mTitle, mPackages, mIsDefault, mWallpaperInfo,
+                    createPreviewInfo());
+        }
+
+        protected PreviewInfo createPreviewInfo() {
             ShapeDrawable shapeDrawable = null;
             if (!TextUtils.isEmpty(mShapePath)) {
                 PathShape shape = new PathShape(PathParser.createPathFromPathData(mShapePath),
-                                PATH_SIZE, PATH_SIZE);
+                        PATH_SIZE, PATH_SIZE);
                 shapeDrawable = new ShapeDrawable(shape);
                 shapeDrawable.setIntrinsicHeight((int) PATH_SIZE);
                 shapeDrawable.setIntrinsicWidth((int) PATH_SIZE);
             }
-            return new ThemeBundle(mTitle, mPackages, mIsDefault, mWallpaperInfo,
-                    new PreviewInfo(mBodyFontFamily, mHeadlineFontFamily, mColorAccentLight,
-                            mColorAccentDark, mIcons, shapeDrawable, mWallpaperAsset,
-                            mColorPreview, mShapePreview));
+            return new PreviewInfo(mBodyFontFamily, mHeadlineFontFamily, mColorAccentLight,
+                    mColorAccentDark, mIcons, shapeDrawable, mWallpaperAsset,
+                    mColorPreview, mShapePreview);
         }
 
         public Builder setTitle(String title) {
