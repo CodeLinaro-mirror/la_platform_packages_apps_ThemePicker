@@ -498,19 +498,39 @@ constructor(private val defaultCustomizationOptionsBinder: DefaultCustomizationO
                         combine(
                                 optionsViewModel.colorPickerViewModel2.overridingColorOption,
                                 optionsViewModel.colorPickerViewModel2.selectedColorOption,
+                                optionsViewModel.colorPickerViewModel2.overridingStyle,
+                                optionsViewModel.colorPickerViewModel2.selectedStyle,
                                 optionsViewModel.darkModeViewModel.overridingIsDarkMode,
-                                ::Triple,
+                                ::Quintuple,
                             )
-                            .collect { (overridingColor, selectedColor, overridingIsDarkMode) ->
-                                if (overridingColor != null || overridingIsDarkMode != null) {
+                            .collect {
+                                (
+                                    overridingColor,
+                                    selectedColor,
+                                    overridingStyle,
+                                    selectedStyle,
+                                    overridingIsDarkMode,
+                                ) ->
+                                if (
+                                    overridingColor != null ||
+                                        overridingStyle != null ||
+                                        overridingIsDarkMode != null
+                                ) {
                                     val previewColorOption = overridingColor ?: selectedColor
                                     val previewIsDarkMode =
                                         overridingIsDarkMode
                                             ?: view.resources.configuration.isNightModeActive
+                                    val previewStyle =
+                                        optionsViewModel.colorPickerViewModel2.getPreviewingStyle(
+                                            selectedStyle,
+                                            overridingStyle,
+                                            selectedColor,
+                                            overridingColor,
+                                        )
                                     previewColorOption?.let {
                                         colorUpdateViewModel.previewColors(
                                             previewColorOption.seedColor,
-                                            previewColorOption.style,
+                                            previewStyle ?: previewColorOption.style,
                                             previewIsDarkMode,
                                         )
                                     }
@@ -816,9 +836,10 @@ constructor(private val defaultCustomizationOptionsBinder: DefaultCustomizationO
                     combine(
                             viewModel.customizationOptionsViewModel.selectedOption,
                             clockPickerViewModel.onClockFaceClicked,
-                            ::Pair,
+                            clockPickerViewModel.previewingClockPresetIndexedStyle,
+                            ::Triple,
                         )
-                        .collect { (selectedOption, onClockFaceClicked) ->
+                        .collect { (selectedOption, onClockFaceClicked, clockPresetIndexedStyle) ->
                             if (
                                 selectedOption == ThemePickerLockCustomizationOption.CLOCK &&
                                     onClockFaceClicked != null
@@ -831,8 +852,17 @@ constructor(private val defaultCustomizationOptionsBinder: DefaultCustomizationO
                                 clockFaceClickDelegateView.isVisible = false
                                 clockFaceClickDelegateView.setOnClickListener(null)
                             }
+                            val clockStyle =
+                                if (clockPresetIndexedStyle?.groupIndex == 0) {
+                                    context.getString(R.string.clock_style_round_clock)
+                                } else {
+                                    context.getString(R.string.clock_style_sharp_clock)
+                                }
                             clockFaceClickDelegateView.contentDescription =
-                                context.getString(R.string.clock_style_round_clock)
+                                context.getString(
+                                    R.string.change_clock_style_content_description,
+                                    clockStyle,
+                                )
                         }
                 }
 
@@ -869,6 +899,14 @@ constructor(private val defaultCustomizationOptionsBinder: DefaultCustomizationO
     }
 
     data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+    data class Quintuple<A, B, C, D, E>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D,
+        val fifth: E,
+    )
 
     companion object {
         private const val THUMBNAIL_CORNER_RADIUS = 18

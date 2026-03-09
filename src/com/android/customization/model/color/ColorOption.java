@@ -64,10 +64,11 @@ public abstract class ColorOption implements CustomizationOption<ColorOption> {
     private final @ColorInt int mSeedColor;
 
     private final boolean mIsThemeServiceEnabled;
+    private final boolean mIsColorPickerUpdateEnabled;
 
     protected ColorOption(String title, Map<String, String> overlayPackages, boolean isDefault,
             int seedColor, @ThemeStyle.Type Integer style, int index,
-            boolean isThemeServiceEnabled) {
+            boolean isThemeServiceEnabled, boolean isColorPickerUpdateEnabled) {
         mTitle = title;
         mIsDefault = isDefault;
         mSeedColor = seedColor;
@@ -75,6 +76,7 @@ public abstract class ColorOption implements CustomizationOption<ColorOption> {
         mIndex = index;
         mPackagesByCategory = Collections.unmodifiableMap(removeNullValues(overlayPackages));
         mIsThemeServiceEnabled = isThemeServiceEnabled;
+        mIsColorPickerUpdateEnabled = isColorPickerUpdateEnabled;
     }
 
     @Override
@@ -90,25 +92,32 @@ public abstract class ColorOption implements CustomizationOption<ColorOption> {
         if (TextUtils.isEmpty(currentStyle)) {
             currentStyle = ThemeStyle.toString(ThemeStyle.TONAL_SPOT);
         }
-        boolean isCurrentStyle = TextUtils.equals(ThemeStyle.toString(getStyle()), currentStyle);
+        // Style is no longer evaluated against settings if color picker update is enabled
+        boolean isCurrentStyle = mIsColorPickerUpdateEnabled || TextUtils.equals(
+                ThemeStyle.toString(getStyle()), currentStyle);
+        if (!isCurrentStyle) {
+            return false;
+        }
 
-        // When theme service is enabled, default color options will no longer be differentiated
-        // from non-default color options.
-        if (!mIsThemeServiceEnabled && mIsDefault) {
-            String serializedOverlays = colorManager.getStoredOverlays();
-            // a default color option is active if the manager has no stored overlays or current
-            // overlays, or the stored overlay does not contain either category system palette or
-            // category color
-            return (TextUtils.isEmpty(serializedOverlays) || EMPTY_JSON.equals(serializedOverlays)
-                    || colorManager.getCurrentOverlays().isEmpty() || !(serializedOverlays.contains(
-                    OVERLAY_CATEGORY_SYSTEM_PALETTE) || serializedOverlays.contains(
-                    OVERLAY_CATEGORY_COLOR))) && isCurrentStyle;
+        String serializedOverlays = colorManager.getStoredOverlays();
+        // Color settings is empty if the manager has no stored overlays or current overlays, or the
+        // stored overlay does not contain either category system palette or category color
+        boolean isColorSettingsEmpty = (TextUtils.isEmpty(serializedOverlays)
+                || EMPTY_JSON.equals(serializedOverlays)
+                || colorManager.getCurrentOverlays().isEmpty()
+                || !(serializedOverlays.contains(OVERLAY_CATEGORY_SYSTEM_PALETTE)
+                || serializedOverlays.contains(OVERLAY_CATEGORY_COLOR)));
+        if (isColorSettingsEmpty) {
+            return mIsDefault;
+        } else if (!mIsThemeServiceEnabled && mIsDefault) {
+            // Before theme service, default options were identified purely by empty settings.
+            return false;
         } else {
             Map<String, String> currentOverlays = colorManager.getCurrentOverlays();
             String currentSource = colorManager.getCurrentColorSource();
             boolean isCurrentSource = TextUtils.isEmpty(currentSource) || getSource().equals(
                     currentSource);
-            return isCurrentSource && isCurrentStyle && mPackagesByCategory.equals(currentOverlays);
+            return isCurrentSource && mPackagesByCategory.equals(currentOverlays);
         }
     }
 
@@ -143,7 +152,7 @@ public abstract class ColorOption implements CustomizationOption<ColorOption> {
      */
     public abstract PreviewInfo getPreviewInfo();
 
-    boolean isDefault() {
+    public boolean isDefault() {
         return mIsDefault;
     }
 
