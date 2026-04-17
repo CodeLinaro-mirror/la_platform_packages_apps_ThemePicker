@@ -41,6 +41,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -84,7 +86,9 @@ fun ColorFloatingSheet(
     modifier: Modifier = Modifier,
 ) {
     val previewingColorOption: ColorOption? by
-        colorPickerViewModel.previewingColorOption.collectAsStateWithLifecycle(initialValue = null)
+        colorPickerViewModel.tempPreviewingColorOption.collectAsStateWithLifecycle(
+            initialValue = null
+        )
     val previewingIsDarkMode: Boolean by
         darkModeViewModel.previewingIsDarkMode.collectAsStateWithLifecycle(initialValue = false)
     val screen: ColorPickerViewModel.Screen by
@@ -93,8 +97,10 @@ fun ColorFloatingSheet(
         darkModeViewModel.toggleDarkMode.collectAsStateWithLifecycle(initialValue = {})
     val isDarkModeToggleEnabled: Boolean by
         darkModeViewModel.isEnabled.collectAsStateWithLifecycle(initialValue = false)
-    val colorSeedOptions: Map<ColorType, List<ColorOptionViewModel>> by
-        colorPickerViewModel.colorSeedOptions.collectAsStateWithLifecycle(initialValue = emptyMap())
+    val colorSeedOptions: List<Pair<ColorType, List<ColorOptionViewModel>>> by
+        colorPickerViewModel.colorSeedOptions.collectAsStateWithLifecycle(
+            initialValue = emptyList()
+        )
     val previewingColorOptionKey: String? by
         colorPickerViewModel.previewingColorOptionKey.collectAsStateWithLifecycle(
             initialValue = null
@@ -102,6 +108,10 @@ fun ColorFloatingSheet(
     val previewingStyle: Int? by
         colorPickerViewModel.previewingStyle.collectAsStateWithLifecycle(initialValue = null)
     val styleOptions = colorPickerViewModel.styleOptions.map { StyleBounceable(it) }
+    val hueSliderPosition: Float by
+        colorPickerViewModel.hueSliderPosition.collectAsStateWithLifecycle(
+            initialValue = ColorPickerViewModel.HUE_INIT_VALUE
+        )
 
     PlatformTheme {
         val scheme =
@@ -130,6 +140,11 @@ fun ColorFloatingSheet(
                                     ColorPickerViewModel.Screen.VARIANT_PICKER
                                 )
                             },
+                            navigateToFreeformPicker = {
+                                colorPickerViewModel.setScreen(
+                                    ColorPickerViewModel.Screen.FREEFORM_PICKER
+                                )
+                            },
                             modifier = modifier,
                         )
                     ColorPickerViewModel.Screen.VARIANT_PICKER ->
@@ -146,6 +161,17 @@ fun ColorFloatingSheet(
                             },
                             modifier = modifier,
                         )
+                    ColorPickerViewModel.Screen.FREEFORM_PICKER ->
+                        FreeformColorPicker(
+                            hueSliderPosition = hueSliderPosition,
+                            onHueChange = colorPickerViewModel::updateHue,
+                            onCancel = colorPickerViewModel::cancelFreeformColor,
+                            onConfirm = colorPickerViewModel::confirmFreeformColor,
+                            navigateToLanding = {
+                                colorPickerViewModel.setScreen(ColorPickerViewModel.Screen.LANDING)
+                            },
+                            modifier = modifier,
+                        )
                 }
             }
         }
@@ -157,9 +183,10 @@ fun ColorFloatingSheetLanding(
     isDarkMode: Boolean,
     toggleIsDarkMode: () -> Unit,
     isDarkModeToggleEnabled: Boolean,
-    colorSeedOptions: Map<ColorType, List<ColorOptionViewModel>>,
+    colorSeedOptions: List<Pair<ColorType, List<ColorOptionViewModel>>>,
     selectedColorSeedKey: String?,
     navigateToVariantPicker: () -> Unit,
+    navigateToFreeformPicker: () -> Unit,
     modifier: Modifier,
 ) {
     val colorScheme: CustomColorScheme = LocalAnimatedColorScheme.current
@@ -169,15 +196,19 @@ fun ColorFloatingSheetLanding(
             val firstVisibleIndex = lazyListState.firstVisibleItemIndex
             var startIdx = 0
             var endIdx = 0
-            for (entries in colorSeedOptions.entries) {
-                endIdx += entries.value.size
+            for (colorTypeToOptions in colorSeedOptions) {
+                endIdx += colorTypeToOptions.second.size
                 if (firstVisibleIndex in startIdx..<endIdx) {
-                    return@derivedStateOf when (entries.key) {
-                        ColorType.WALLPAPER_COLOR -> R.string.wallpaper_color_tab
-                        ColorType.PRESET_COLOR -> R.string.preset_color_tab
+                    return@derivedStateOf when (colorTypeToOptions.first) {
+                        ColorType.WALLPAPER_COLOR -> R.string.wallpaper_color_title_2
+                        ColorType.PRESET_COLOR -> R.string.preset_color_tab_2
+                        ColorType.FREEFORM_COLOR -> R.string.freeform_color_title
                     }
                 } else {
                     startIdx = endIdx
+                    // Account for the divider added between color types, and count it as the next
+                    // group
+                    endIdx += 1
                 }
             }
             return@derivedStateOf R.string.wallpaper_color_tab
@@ -192,32 +223,55 @@ fun ColorFloatingSheetLanding(
                 .clip(shape = RoundedCornerShape(28.dp))
                 .drawBehind { drawRect(colorScheme.surfaceBright) }
     ) {
-        Column(modifier = Modifier.padding(vertical = 20.dp)) {
-            AnimatedContent(
-                targetState = textResId,
-                transitionSpec = {
-                    fadeIn(
-                        animationSpec = tween(durationMillis = 200, delayMillis = 200)
-                    ) togetherWith fadeOut(animationSpec = tween(durationMillis = 200))
-                },
-            ) { text ->
-                Text(
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                    text = stringResource(text),
-                    color = colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                )
+        Column(modifier = Modifier.padding(top = 16.dp, bottom = 20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AnimatedContent(
+                    targetState = textResId,
+                    transitionSpec = {
+                        fadeIn(
+                            animationSpec = tween(durationMillis = 200, delayMillis = 200)
+                        ) togetherWith fadeOut(animationSpec = tween(durationMillis = 200))
+                    },
+                ) { text ->
+                    Text(
+                        text = stringResource(text),
+                        color = colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+
+                IconButton(
+                    modifier = Modifier.size(32.dp),
+                    onClick = navigateToFreeformPicker,
+                    colors =
+                        IconButtonDefaults.iconButtonColors(
+                            containerColor = colorScheme.surfaceDim,
+                            contentColor = colorScheme.onSurface,
+                        ),
+                ) {
+                    Icon(
+                        modifier = Modifier.size(20.dp),
+                        painter = painterResource(R.drawable.ic_palette_filled_24px),
+                        contentDescription = "",
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // TODO (b/441279631): implement scroll to selected color option
             LazyRow(
                 state = lazyListState,
                 verticalAlignment = Alignment.CenterVertically,
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                colorSeedOptions.values.forEachIndexed { colorTypeIdx, colorList ->
+                colorSeedOptions.forEachIndexed { colorTypeIdx, colorTypeToOptions ->
+                    val colorList = colorTypeToOptions.second
                     if (colorTypeIdx != 0 && colorList.isNotEmpty()) {
                         item { OptionListGroupDivider() }
                     }

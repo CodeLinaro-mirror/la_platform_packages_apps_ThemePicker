@@ -23,6 +23,8 @@ import com.android.customization.module.CustomizationInjector
 import com.android.customization.module.CustomizationPreferences
 import com.android.customization.module.logging.TestThemesUserEventLogger
 import com.android.customization.module.logging.ThemesUserEventLogger
+import com.android.customization.picker.clock.ai.ClockStyleViewUtil
+import com.android.customization.picker.clock.ai.DefaultClockStyleViewUtil
 import com.android.customization.picker.clock.data.repository.ClockPickerRepository
 import com.android.customization.picker.clock.data.repository.ClockPickerRepositoryImpl
 import com.android.customization.picker.clock.data.repository.ClockRegistryProvider
@@ -57,7 +59,9 @@ import com.android.wallpaper.picker.category.domain.interactor.ThirdPartyCategor
 import com.android.wallpaper.picker.category.ui.view.providers.IndividualPickerFactory
 import com.android.wallpaper.picker.category.ui.view.providers.implementation.DefaultIndividualPickerFactory
 import com.android.wallpaper.picker.category.wrapper.WallpaperCategoryWrapper
+import com.android.wallpaper.picker.common.preview.ui.binder.ThemePickerWorkspaceBinder
 import com.android.wallpaper.picker.common.preview.ui.binder.ThemePickerWorkspaceCallbackBinder
+import com.android.wallpaper.picker.common.preview.ui.binder.WorkspaceBinder
 import com.android.wallpaper.picker.common.preview.ui.binder.WorkspaceCallbackBinder
 import com.android.wallpaper.picker.customization.ui.binder.CustomizationOptionsBinder
 import com.android.wallpaper.picker.customization.ui.binder.DefaultCustomizationOptionsBinder
@@ -183,6 +187,10 @@ abstract class ThemePickerTestModule {
 
     @Binds
     @Singleton
+    abstract fun bindClockStyleViewUtil(impl: DefaultClockStyleViewUtil): ClockStyleViewUtil
+
+    @Binds
+    @Singleton
     abstract fun bindOnDeviceWallpapersInteractor(
         impl: FakeOnDeviceWallpapersInteractor
     ): OnDeviceWallpapersInteractor
@@ -228,6 +236,10 @@ abstract class ThemePickerTestModule {
     abstract fun bindWallpaperPreferences(
         impl: TestDefaultCustomizationPreferences
     ): WallpaperPreferences
+
+    @Binds
+    @Singleton
+    abstract fun bindWorkspaceBinder(impl: ThemePickerWorkspaceBinder): WorkspaceBinder
 
     @Binds
     @Singleton
